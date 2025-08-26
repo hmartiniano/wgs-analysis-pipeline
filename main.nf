@@ -181,7 +181,6 @@ process JOINT_CALLING_GLNEXUS {
 process MULTIQC {
     publishDir "${params.outdir}/multiqc", mode: 'copy'
 
-_
     input:
     path '*'
 
