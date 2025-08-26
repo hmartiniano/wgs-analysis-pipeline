@@ -19,11 +19,11 @@ joint_calling: true
 # Specify the Docker or Singularity container images for each tool.
 # Using specific versions ensures reproducibility.
 containers:
-  fastp: "docker://quay.io/biocontainers/fastp:0.23.2--h79da9fb_0"
-  bwa_samtools: "docker://quay.io/biocontainers/bwa-mem2:2.2.1--h572174a_3" # This container also has samtools
-  deepvariant: "docker://google/deepvariant:1.5.0"
-  glnexus: "docker://quay.io/biocontainers/glnexus:1.4.1--h9ee0642_0"
-  multiqc: "docker://quay.io/biocontainers/multiqc:1.14--pyhdfd78af_0"
+  fastp: "docker://quay.io/biocontainers/fastp:1.0.1-0"
+  bwa_samtools: "docker://quay.io/biocontainers/bwa-mem2:2.3--h5b5514e_2" # This container also has samtools
+  deepvariant: "docker://google/deepvariant:1.9.0"
+  glnexus: "docker://quay.io/biocontainers/glnexus:1.4.1-5"
+  multiqc: "docker://quay.io/biocontainers/multiqc:1.30--pyhdfd78af_1"
 
 # --- Optional Parameters ---
 # Add extra command-line parameters for specific tools if needed.
