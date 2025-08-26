@@ -1,0 +1,16 @@
+input:
+  r1: "giab_benchmark/data/fastq/HG002/HG002.novaseq.pcr-free.35x.R1.fastq.gz"
+  r2: "giab_benchmark/data/fastq/HG002/HG002.novaseq.pcr-free.35x.R2.fastq.gz"
+ref_fasta: "giab_benchmark/data/reference/GRCh38/GRCh38_GIABv3_no_alt_analysis_set_maskedGRC_decoys_MAP2K3_KMT2C_KCNJ18.fasta.gz"
+bwa_index: "genome.bwa" # This will need to be generated or provided
+outdir: "results_snakemake"
+joint_calling: false
+
+# Container versions
+containers:
+  fastp: 'quay.io/biocontainers/fastp:0.24.2--hafa4716_0'
+  bwa_mem2: 'quay.io/biocontainers/bwa-mem2:2.3--h5b5514e_2'
+  samtools: 'quay.io/biocontainers/samtools:1.22--h50ea8bc_0'
+  deepvariant: 'google/deepvariant:1.8.0'
+  glnexus: 'quay.io/biocontainers/glnexus:1.4.1--h9ee0642_0'
+  multiqc: 'quay.io/biocontainers/multiqc:1.30--pyhdfd78af_0'
