@@ -75,15 +75,16 @@ rule align_bwa_mem2:
         flagstat = "results/bam/{sample}/{sample}.flagstat.txt"
     params:
         # The read group string is essential for downstream tools.
-        rg_string = lambda wildcards: f"@RG\\tID:{wildcards.sample}\\tSM:{wildcards.sample}\\tPL:ILLUMINA"
+        rg_string = lambda wildcards: f"@RG\\tID:{wildcards.sample}\\tSM:{wildcards.sample}\\tPL:ILLUMINA",
+        bwa_mem_dir = "/projects/F202400011TESTDEUCALION/bwa-mem2-2.3_x64-linux"
     log:
         "logs/align_bwa_mem2/{sample}.log"
     threads: 16
-    container:
-        config["containers"]["bwa_samtools"] # Using a combined container for efficiency
+#    container:
+#        config["containers"]["bwa_samtools"] # Using a combined container for efficiency
     shell:
         """
-        (bwa-mem2 mem \\
+        ({params.bwa_mem_dir}/bwa-mem2 mem \\
             -t {threads} \\
             -R '{params.rg_string}' \\
             {input.bwa_index} \\
