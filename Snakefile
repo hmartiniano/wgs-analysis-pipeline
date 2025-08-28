@@ -61,8 +61,7 @@ rule fastp:
         """
 
 # --- Rule: ALIGN_BWA_MEM2 ---
-# Aligns trimmed reads to the reference genome, sorts the resulting SAM file,
-# and converts it to BAM format.
+# Aligns trimmed reads to the reference genome
 rule align_bwa_mem2:
     input:
         r1 = "results/fastp/{sample}/{sample}.trimmed.R1.fastq.gz",
@@ -70,30 +69,47 @@ rule align_bwa_mem2:
         ref_fasta = config["ref_fasta"],
         bwa_index = config["bwa_index"] # This should be the prefix, not the files themselves
     output:
-        bam = "results/bam/{sample}/{sample}.sorted.bam",
-        bai = "results/bam/{sample}/{sample}.sorted.bam.bai",
-        flagstat = "results/bam/{sample}/{sample}.flagstat.txt"
+        sam = "results/bam/{sample}/{sample}.sam"
     params:
         # The read group string is essential for downstream tools.
-        rg_string = lambda wildcards: f"@RG\\tID:{wildcards.sample}\\tSM:{wildcards.sample}\\tPL:ILLUMINA",
+        rg_string = lambda wildcards: f"@RG\tID:{wildcards.sample}\tSM:{wildcards.sample}\tPL:ILLUMINA",
     log:
         "logs/align_bwa_mem2/{sample}.log"
     threads: 16
     container:
-        config["containers"]["bwa_samtools"] # Using a combined container for efficiency
+        config["containers"]["bwa"]
     shell:
         """
-        (bwa-mem2 mem \\
-            -t {threads} \\
-            -R '{params.rg_string}' \\
-            {input.bwa_index} \\
-            {input.r1} \\
-            {input.r2} | \\
-        samtools sort -@ {threads} -o {output.bam} -) >& {log}
+        (bwa-mem2 mem \
+            -t {threads} \
+            -R '{params.rg_string}' \
+            {input.bwa_index} \
+            {input.r1} \
+            {input.r2} > {output.sam}) >& {log}
+        """
+
+# --- Rule: SAMTOOLS_SORT_INDEX ---
+# Sorts the SAM file, converts it to BAM format, and indexes it.
+rule samtools_sort_index:
+    input:
+        sam = "results/bam/{sample}/{sample}.sam"
+    output:
+        bam = "results/bam/{sample}/{sample}.sorted.bam",
+        bai = "results/bam/{sample}/{sample}.sorted.bam.bai",
+        flagstat = "results/bam/{sample}/{sample}.flagstat.txt"
+    log:
+        "logs/samtools_sort_index/{sample}.log"
+    threads: 16
+    container:
+        config["containers"]["samtools"]
+    shell:
+        """
+        (samtools sort -@ {threads} -o {output.bam} {input.sam}) >& {log}
 
         samtools index {output.bam}
         samtools flagstat {output.bam} > {output.flagstat}
         """
+
 
 # --- Rule: MARK_DUPLICATES ---
 # Identifies and marks PCR duplicates in the aligned BAM file.

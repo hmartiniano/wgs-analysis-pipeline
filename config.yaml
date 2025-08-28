@@ -20,7 +20,8 @@ joint_calling: true
 # Using specific versions ensures reproducibility.
 containers:
   fastp: "docker://quay.io/biocontainers/fastp:1.0.1--heae3180_0"
-  bwa_samtools: "docker://quay.io/biocontainers/bwa-mem2:2.3--he70b90d_0" # This container also has samtools
+  bwa: "docker://quay.io/biocontainers/bwa-mem2:2.3--he70b90d_0"
+  samtools: "docker://quay.io/biocontainers/samtools:1.22.1--h96c455f_0"
   deepvariant: "docker://google/deepvariant:1.9.0"
   glnexus: "docker://quay.io/biocontainers/glnexus:1.4.1--h17e8430_5"
   multiqc: "docker://quay.io/biocontainers/multiqc:1.30--pyhdfd78af_1"
