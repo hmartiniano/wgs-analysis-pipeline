@@ -124,7 +124,7 @@ rule mark_duplicates:
         "logs/mark_duplicates/{sample}.log"
     threads: 8
     container:
-        config["containers"]["bwa_samtools"]
+        config["containers"]["samtools"]
     shell:
         """
         (samtools markdup \\
