@@ -127,7 +127,7 @@ rule mark_duplicates:
         config["containers"]["samtools"]
     shell:
         """
-        (samtools sort -n -@ {threads} -o - {input.bam} | samtools fixmate -m -@ {threads} - - | samtools markdup -r -@ {threads} - {output.bam}) >& {log}
+        (samtools sort -n -@ {threads} -o - {input.bam} | samtools fixmate -m -@ {threads} - - | samtools sort -@ {threads} -o - | samtools markdup -r -@ {threads} - {output.bam}) >& {log}
 
         samtools index {output.bam}
         """
