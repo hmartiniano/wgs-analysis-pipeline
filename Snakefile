@@ -127,14 +127,11 @@ rule mark_duplicates:
         config["containers"]["samtools"]
     shell:
         """
-        (samtools markdup \\
-            -@ {threads} \\
-            -r \\
-            {input.bam} \\
-            {output.bam}) >& {log}
+        (samtools fixmate -@ {threads} -m {input.bam} - | samtools markdup -@ {threads} -r - {output.bam}) >& {log}
 
         samtools index {output.bam}
         """
+
 
 # --- Rule: DEEPVARIANT ---
 # Calls variants for a single sample using the DeepVariant model.
