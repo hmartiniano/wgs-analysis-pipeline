@@ -152,20 +152,13 @@ rule deepvariant:
         config["containers"]["deepvariant"]
     shell:
         """
-        # DeepVariant requires the reference and its index to be in the working directory.
-        # We create symlinks to avoid copying large files.
-        ln -s $(realpath {input.ref_fasta}) .
-        ln -s $(realpath {input.ref_fasta}.fai) .
-
-        REF_FASTA_BASENAME=$(basename {input.ref_fasta})
-
-        /opt/deepvariant/bin/run_deepvariant \\
-            --model_type=WGS \\
-            --ref=${{REF_FASTA_BASENAME}} \\
-            --reads={input.bam} \\
-            --output_vcf=$(basename {output.vcf}) \\
-            --output_gvcf=$(basename {output.gvcf}) \\
-            --num_shards={threads} \\
+        /opt/deepvariant/bin/run_deepvariant \
+            --model_type=WGS \
+            --ref=$(realpath {input.ref_fasta}) \
+            --reads={input.bam} \
+            --output_vcf=$(basename {output.vcf}) \
+            --output_gvcf=$(basename {output.gvcf}) \
+            --num_shards={threads} \
             --intermediate_results_dir ./intermediate_dir >& {log}
 
         # The HTML report is generated inside the intermediate directory.
