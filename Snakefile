@@ -144,10 +144,10 @@ rule deepvariant:
         vcf = "results/variants/single_sample/{sample}/{sample}.deepvariant.vcf.gz",
         gvcf = "results/variants/single_sample/{sample}/{sample}.deepvariant.g.vcf.gz",
         tbi = "results/variants/single_sample/{sample}/{sample}.deepvariant.vcf.gz.tbi",
-        html = "results/variants/single_sample/{sample}/{sample}.deepvariant.html"
+        html = "results/variants/single_sample/{sample}/{sample}.deepvariant.visual_report.html"
     log:
         "logs/deepvariant/{sample}.log"
-    threads: 16
+    threads: 64
     container:
         config["containers"]["deepvariant"]
     shell:
@@ -156,14 +156,16 @@ rule deepvariant:
             --model_type=WGS \
             --ref=$(realpath {input.ref_fasta}) \
             --reads={input.bam} \
-            --output_vcf=$(basename {output.vcf}) \
-            --output_gvcf=$(basename {output.gvcf}) \
+            --output_vcf={output.vcf} \
+            --output_gvcf={output.gvcf} \
             --num_shards={threads} \
-            --intermediate_results_dir ./intermediate_dir >& {log}
+            --vcf_stats_report=true \
+            --regions chr21 \
+            --intermediate_results_dir $(realpath intermediate_dir) >& {log}
 
         # The HTML report is generated inside the intermediate directory.
         # We move it to the final output location.
-        mv intermediate_dir/report.html {output.html}
+        #	mv intermediate_dir/report.html {output.html}
         """
 
 # --- Rule: JOINT_CALLING_GLNEXUS ---
