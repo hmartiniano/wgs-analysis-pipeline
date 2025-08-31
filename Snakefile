@@ -28,12 +28,20 @@ rule all:
 #   Define Analysis Rules
 # ====================================================================================
 
+# --- Helper Function for Input Files ---
+# This function retrieves the paths to the FASTQ files for a given sample.
+# Using a helper function can make the rule inputs cleaner and more readable.
+def get_fastqs(wildcards):
+    return {
+        'r1': SAMPLES_DF.loc[wildcards.sample, 'fastq_1'],
+        'r2': SAMPLES_DF.loc[wildcards.sample, 'fastq_2']
+    }
+
 # --- Rule: FASTP ---
 # Performs quality control and trimming on raw FASTQ reads.
 rule fastp:
     input:
-        r1 = lambda wildcards: SAMPLES_DF.loc[wildcards.sample, "fastq_1"],
-        r2 = lambda wildcards: SAMPLES_DF.loc[wildcards.sample, "fastq_2"]
+        unpack(get_fastqs)
     output:
         r1 = "results/fastp/{sample}/{sample}.trimmed.R1.fastq.gz",
         r2 = "results/fastp/{sample}/{sample}.trimmed.R2.fastq.gz",
@@ -61,13 +69,15 @@ rule fastp:
         """
 
 # --- Rule: ALIGN_BWA_MEM2 ---
-# Aligns trimmed reads to the reference genome
+# Aligns trimmed reads to the reference genome.
+# The reference genome and its index are marked as `ancient` files, meaning
+# Snakemake will not attempt to regenerate them if they are older than the input.
 rule align_bwa_mem2:
     input:
         r1 = "results/fastp/{sample}/{sample}.trimmed.R1.fastq.gz",
         r2 = "results/fastp/{sample}/{sample}.trimmed.R2.fastq.gz",
-        ref_fasta = config["ref_fasta"],
-        bwa_index = config["bwa_index"] # This should be the prefix, not the files themselves
+        ref_fasta = ancient(config["ref_fasta"]),
+        bwa_index = ancient(config["bwa_index"]) # This should be the prefix, not the files themselves
     output:
         sam = "results/bam/{sample}/{sample}.sam"
     params:
@@ -88,53 +98,42 @@ rule align_bwa_mem2:
             {input.r2} > {output.sam}) >& {log}
         """
 
-# --- Rule: SAMTOOLS_SORT_INDEX ---
-# Sorts the SAM file, converts it to BAM format, and indexes it.
-rule samtools_sort_index:
+# --- Rule: BAM_PROCESSING ---
+# This rule combines several steps to process the aligned SAM file:
+# 1. Sorts the SAM file and converts it to BAM format.
+# 2. Marks PCR duplicates to improve variant calling accuracy.
+# 3. Indexes the final BAM file for fast access.
+# Chaining these commands with pipes is more efficient as it avoids writing
+# intermediate files to disk.
+rule bam_processing:
     input:
         sam = "results/bam/{sample}/{sample}.sam"
     output:
-        bam = "results/bam/{sample}/{sample}.sorted.bam",
-        bai = "results/bam/{sample}/{sample}.sorted.bam.bai",
+        bam = "results/bam/{sample}/{sample}.dedup.bam",
+        bai = "results/bam/{sample}/{sample}.dedup.bam.bai",
         flagstat = "results/bam/{sample}/{sample}.flagstat.txt"
     log:
-        "logs/samtools_sort_index/{sample}.log"
+        "logs/bam_processing/{sample}.log"
     threads: 16
     container:
         config["containers"]["samtools"]
     shell:
         """
-        (samtools sort -@ {threads} -o {output.bam} {input.sam}) >& {log}
+        (samtools sort -@ {threads} -o - {input.sam} | \
+            samtools fixmate -m -@ {threads} - - | \
+            samtools sort -@ {threads} -o - | \
+            samtools markdup -r -@ {threads} - {output.bam}) >& {log}
 
         samtools index {output.bam}
         samtools flagstat {output.bam} > {output.flagstat}
         """
 
 
-# --- Rule: MARK_DUPLICATES ---
-# Identifies and marks PCR duplicates in the aligned BAM file.
-rule mark_duplicates:
-    input:
-        bam = "results/bam/{sample}/{sample}.sorted.bam",
-        bai = "results/bam/{sample}/{sample}.sorted.bam.bai"
-    output:
-        bam = "results/bam/{sample}/{sample}.dedup.bam",
-        bai = "results/bam/{sample}/{sample}.dedup.bam.bai"
-    log:
-        "logs/mark_duplicates/{sample}.log"
-    threads: 8
-    container:
-        config["containers"]["samtools"]
-    shell:
-        """
-        (samtools sort -n -@ {threads} -o - {input.bam} | samtools fixmate -m -@ {threads} - - | samtools sort -@ {threads} -o - | samtools markdup -r -@ {threads} - {output.bam}) >& {log}
-
-        samtools index {output.bam}
-        """
-
 
 # --- Rule: DEEPVARIANT ---
 # Calls variants for a single sample using the DeepVariant model.
+# It uses a temporary directory for intermediate files, which is automatically
+# cleaned up by Snakemake upon successful rule completion.
 rule deepvariant:
     input:
         bam = "results/bam/{sample}/{sample}.dedup.bam",
@@ -144,7 +143,8 @@ rule deepvariant:
         vcf = "results/variants/single_sample/{sample}/{sample}.deepvariant.vcf.gz",
         gvcf = "results/variants/single_sample/{sample}/{sample}.deepvariant.g.vcf.gz",
         tbi = "results/variants/single_sample/{sample}/{sample}.deepvariant.vcf.gz.tbi",
-        html = "results/variants/single_sample/{sample}/{sample}.deepvariant.visual_report.html"
+        html = "results/variants/single_sample/{sample}/{sample}.deepvariant.visual_report.html",
+        intermediate_dir = temp("intermediate_dir/{sample}")
     log:
         "logs/deepvariant/{sample}.log"
     threads: 64
@@ -161,12 +161,13 @@ rule deepvariant:
             --num_shards={threads} \
             --vcf_stats_report=true \
             --regions chr21 \
-            --intermediate_results_dir $(realpath intermediate_dir) >& {log}
+            --intermediate_results_dir {output.intermediate_dir} >& {log}
 
         # The HTML report is generated inside the intermediate directory.
         # We move it to the final output location.
-        #	mv intermediate_dir/report.html {output.html}
+        mv {output.intermediate_dir}/report.html {output.html}
         """
+
 
 # --- Rule: JOINT_CALLING_GLNEXUS ---
 # Aggregates gVCFs from all samples and performs joint variant calling.
