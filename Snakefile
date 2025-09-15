@@ -52,7 +52,7 @@ rule fastp:
         extra = config.get("params", {}).get("fastp", "")
     log:
         "logs/fastp/{sample}.log"
-    threads: 8
+    threads: 64
     container:
         config["containers"]["fastp"]
     shell:
@@ -79,13 +79,13 @@ rule align_bwa_mem2:
         ref_fasta = ancient(config["ref_fasta"]),
         bwa_index = ancient(config["bwa_index"]) # This should be the prefix, not the files themselves
     output:
-        sam = "results/bam/{sample}/{sample}.sam"
+        bam = "results/bam/{sample}/{sample}.align.bam"
     params:
         # The read group string is essential for downstream tools.
         rg_string = lambda wildcards: f"@RG\tID:{wildcards.sample}\tSM:{wildcards.sample}\tPL:ILLUMINA",
     log:
         "logs/align_bwa_mem2/{sample}.log"
-    threads: 16
+    threads: 64
     container:
         config["containers"]["bwa"]
     shell:
@@ -95,7 +95,7 @@ rule align_bwa_mem2:
             -R '{params.rg_string}' \
             {input.bwa_index} \
             {input.r1} \
-            {input.r2} > {output.sam}) >& {log}
+            {input.r2} | samtools view -b -o {output.bam}) >& {log}
         """
 
 # --- Rule: BAM_PROCESSING ---
@@ -107,25 +107,25 @@ rule align_bwa_mem2:
 # intermediate files to disk.
 rule bam_processing:
     input:
-        sam = "results/bam/{sample}/{sample}.sam"
+        bam = "results/bam/{sample}/{sample}.align.bam"
     output:
         bam = "results/bam/{sample}/{sample}.dedup.bam",
         bai = "results/bam/{sample}/{sample}.dedup.bam.bai",
         flagstat = "results/bam/{sample}/{sample}.flagstat.txt"
     log:
         "logs/bam_processing/{sample}.log"
-    threads: 16
+    threads: 64
     container:
         config["containers"]["samtools"]
     shell:
         """
-        (samtools sort -@ {threads} -o - {input.sam} | \
-            samtools fixmate -m -@ {threads} - - | \
-            samtools sort -@ {threads} -o - | \
-            samtools markdup -r -@ {threads} - {output.bam}) >& {log}
+        (samtools collate -@ 8 -O {input.bam} | \
+            samtools fixmate -m -@ 8 - - | \
+            samtools sort -@ 8 - | \
+            samtools markdup -r -@ 8 - {output.bam}) >& {log}
 
         samtools index {output.bam}
-        samtools flagstat {output.bam} > {output.flagstat}
+        samtools flagstat {input.bam} > {output.flagstat}
         """
 
 
@@ -160,7 +160,6 @@ rule deepvariant:
             --output_gvcf={output.gvcf} \
             --num_shards={threads} \
             --vcf_stats_report=true \
-            --regions chr21 \
             --intermediate_results_dir {output.intermediate_dir} >& {log}
 
         # The HTML report is generated inside the intermediate directory.
@@ -181,7 +180,7 @@ rule joint_calling_glnexus:
         csi = "results/variants/joint_called/joint_variants.bcf.csi"
     log:
         "logs/joint_calling/glnexus.log"
-    threads: 24
+    threads: 64
     resources:
         # GLnexus is memory intensive. Define memory as a resource.
         mem_mb=100000
